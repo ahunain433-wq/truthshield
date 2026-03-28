@@ -53,8 +53,8 @@ Make sure you have the following installed:
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/Hassan-Jamal8735/Hackathon-Project-.git
-cd Hackathon-Project-
+git clone https://github.com/ahunain433-wq/truthshield.git
+cd truthshield
 ```
 
 ---
