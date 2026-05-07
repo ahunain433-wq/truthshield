@@ -23,3 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 *.env
+
+# AI Model
+truthshield_model/
+ai_model/results/
+results/
+__pycache__/
+*.pth
+*.bin
+*.safetensors
+*.pt

@@ -37,23 +37,31 @@ console.log('=== END INPUT TEXT ===');
   
   // Try AI services in order
   try {
+    // 0. Try Local Model (Custom DistilBERT)
+    console.log('📤 [0/4] Attempting Local AI Model...');
+    const localResult = await analyzeWithLocalModel(text);
+    
+    if (localResult && localResult.label !== 'ERROR') {
+      console.log('✅ Local Model analysis SUCCESSFUL!');
+      return localResult;
+    } else {
+      console.log('ℹ️ Local model not available, falling back to APIs...');
+    }
+
     // 1. Try Gemini
-    console.log('📤 [1/3] Attempting Gemini API...');
+    console.log('📤 [1/4] Attempting Gemini API...');
     const geminiResult = await analyzeWithGemini(text);
     console.log('📥 Gemini result:', geminiResult);
     
     if (geminiResult && geminiResult.label !== 'ERROR' && geminiResult.source === 'gemini') {
       console.log('✅ Gemini analysis SUCCESSFUL!');
-      console.log('Label:', geminiResult.label);
-      console.log('Confidence:', geminiResult.confidence);
-      console.log('Source:', geminiResult.source);
       return geminiResult;
     } else {
       console.warn('⚠️ Gemini failed or returned error');
     }
     
     // 2. Try Hugging Face
-    console.log('📤 [2/3] Attempting Hugging Face API...');
+    console.log('📤 [2/4] Attempting Hugging Face API...');
     const hfResult = await analyzeWithHuggingFace(text);
     console.log('📥 Hugging Face result:', hfResult);
     
@@ -65,13 +73,50 @@ console.log('=== END INPUT TEXT ===');
     }
     
     // 3. Fallback to mock
-    console.log('🔄 [3/3] All AI services failed, falling back to mock analysis');
+    console.log('🔄 [3/4] All AI services failed, falling back to mock analysis');
     return await analyzeMock(text);
     
   } catch (error) {
     console.error('❌ All AI services failed with error:', error.message);
     console.error('Error stack:', error.stack);
     return await analyzeMock(text);
+  }
+};
+
+// Local Model Analysis (TruthShield Custom Model)
+export const analyzeWithLocalModel = async (text) => {
+  try {
+    // Call the FastAPI server we created in ai_model/server.py
+    const response = await fetch('http://localhost:8000/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        text: text.substring(0, 1000) // The model handles up to 512 tokens
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Local model server is offline or returned an error');
+    }
+
+    const data = await response.json();
+    
+    return {
+      label: data.status.toUpperCase(), // FAKE, SUSPICIOUS, CREDIBLE
+      confidence: data.trust_score / 100,
+      explanation: data.analysis,
+      source: 'local-model',
+      keywords: []
+    };
+  } catch (error) {
+    // Only log warning, as we want to silently fall back to Gemini
+    console.warn('⚠️ Local model analysis skipped:', error.message);
+    return {
+      label: 'ERROR',
+      source: 'local-error'
+    };
   }
 };
 

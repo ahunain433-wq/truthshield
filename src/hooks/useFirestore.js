@@ -78,12 +78,34 @@ export const useFirestore = () => {
           ...doc.data() 
         });
       });
+
+      // MERGE WITH LOCAL STORAGE
+      const localKey = `truthshield_local_${collectionName}`;
+      const localData = JSON.parse(localStorage.getItem(localKey) || '[]');
       
-      return documents;
+      // Filter local data based on userId if applicable
+      const userIdFilter = filters.find(f => f.field === 'userId');
+      const filteredLocal = userIdFilter 
+        ? localData.filter(d => d.userId === userIdFilter.value)
+        : localData;
+
+      // Combine and remove duplicates (by fileName/content)
+      const combined = [...documents];
+      filteredLocal.forEach(localDoc => {
+        if (!combined.some(d => d.fileName === localDoc.fileName && d.createdAt === localDoc.createdAt)) {
+          combined.push(localDoc);
+        }
+      });
+      
+      return combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     } catch (err) {
-      setError(err.message);
-      console.error('Error getting documents:', err);
-      return [];
+      console.warn('Firestore fetch failed, returning local storage only:', err.message);
+      const localKey = `truthshield_local_${collectionName}`;
+      const localData = JSON.parse(localStorage.getItem(localKey) || '[]');
+      const userIdFilter = filters.find(f => f.field === 'userId');
+      return userIdFilter 
+        ? localData.filter(d => d.userId === userIdFilter.value)
+        : localData;
     } finally {
       setLoading(false);
     }
@@ -95,6 +117,18 @@ export const useFirestore = () => {
     setError(null);
     
     try {
+      // Create local backup
+      const localKey = `truthshield_local_${collectionName}`;
+      const localData = JSON.parse(localStorage.getItem(localKey) || '[]');
+      const newDoc = { 
+        id: 'local_' + Date.now(), 
+        ...data, 
+        createdAt: new Date().toISOString(),
+        isLocalOnly: true 
+      };
+      localData.unshift(newDoc);
+      localStorage.setItem(localKey, JSON.stringify(localData.slice(0, 50)));
+
       const docRef = await addDoc(collection(db, collectionName), {
         ...data,
         createdAt: serverTimestamp(),
@@ -104,8 +138,9 @@ export const useFirestore = () => {
       return { id: docRef.id, ...data };
     } catch (err) {
       setError(err.message);
-      console.error('Error adding document:', err);
-      return null;
+      console.error('Error adding document (using local fallback):', err);
+      // Even if firestore fails, return the local doc so the app keeps working
+      return { id: 'local_' + Date.now(), ...data, isLocalOnly: true };
     } finally {
       setLoading(false);
     }
